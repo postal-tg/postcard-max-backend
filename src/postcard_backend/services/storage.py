@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import boto3
 from botocore.client import Config
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from postcard_backend.core.config import Settings
 
@@ -19,6 +20,7 @@ class ObjectStorage:
             config=Config(signature_version="s3v4"),
         )
 
+    @retry(wait=wait_fixed(2), stop=stop_after_attempt(10), reraise=True)
     def ensure_bucket(self) -> None:
         existing = [item["Name"] for item in self.client.list_buckets().get("Buckets", [])]
         if self.settings.storage_bucket not in existing:
