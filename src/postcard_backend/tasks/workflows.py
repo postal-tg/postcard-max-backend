@@ -2,6 +2,7 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from postcard_backend.core.config import get_settings
@@ -62,6 +63,10 @@ def process_webhook_event(event_id: int) -> None:
             db.commit()
         except Exception as exc:
             logger.exception("Webhook event failed", extra={"event_id": event_id})
+            db.rollback()
+            event = db.get(WebhookEvent, event_id)
+            if not event:
+                return
             event.status = "failed"
             event.error_message = str(exc)
             event.processed_at = datetime.now(UTC)
@@ -239,6 +244,7 @@ def generate_postcard(generation_id: int) -> None:
         prompt = generation.prompt
         user = prompt.user
         generation.status = "processing"
+        generation.error_message = None
         generation.started_at = datetime.now(UTC)
         db.commit()
 
@@ -279,6 +285,7 @@ def generate_postcard(generation_id: int) -> None:
             )
             generation.delivery_payload = delivery_payload
             generation.status = "completed"
+            generation.error_message = None
             generation.finished_at = datetime.now(UTC)
 
             if generation.started_at:
@@ -380,7 +387,19 @@ def _persist_user(
         user.last_name = last_name
         user.locale = locale
         user.last_seen_at = now
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        user = db.scalar(select(User).where(User.max_user_id == max_user_id))
+        if user is None:
+            raise
+        user.username = username
+        user.first_name = first_name
+        user.last_name = last_name
+        user.locale = locale
+        user.last_seen_at = now
+        db.commit()
     db.refresh(user)
     return user
 

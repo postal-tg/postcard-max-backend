@@ -2,8 +2,10 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 
+@retry(wait=wait_fixed(2), stop=stop_after_attempt(20), reraise=True)
 def main() -> None:
     project_root = Path.cwd()
     if not (project_root / "alembic.ini").exists():
