@@ -41,7 +41,7 @@ def normalize_user_prompt(raw_text: str, settings: Settings) -> PromptValidation
     provider_prompt = (
         f"{settings.postcard_style_preamble}\n"
         f"Theme from user: {plain_text}\n"
-        "Create a single postcard image without any visible text, letters, signatures, or captions inside the artwork."
+        "Create a single postcard image with no visible text, letters, signatures, or captions inside the artwork."
     )
     prompt_hash = hashlib.sha256(plain_text.encode("utf-8")).hexdigest()
     return PromptValidationResult(
