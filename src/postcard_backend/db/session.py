@@ -2,7 +2,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from postcard_backend.core.config import get_settings
-from postcard_backend.models import Conversation, GenerationRequest, Prompt, User, WebhookEvent
 from postcard_backend.models.base import Base
 
 settings = get_settings()

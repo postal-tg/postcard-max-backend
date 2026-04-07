@@ -1,7 +1,6 @@
+from fastapi import APIRouter
 import redis
 from sqlalchemy import text
-
-from fastapi import APIRouter
 
 from postcard_backend.core.config import get_settings
 from postcard_backend.db.session import engine
