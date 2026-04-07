@@ -1,5 +1,5 @@
-from fastapi import APIRouter
 import redis
+from fastapi import APIRouter
 from sqlalchemy import text
 
 from postcard_backend.core.config import get_settings
