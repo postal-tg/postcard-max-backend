@@ -1,7 +1,8 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from postcard_backend.core.config import get_settings
@@ -56,15 +57,19 @@ def process_webhook_event(event_id: int) -> None:
             else:
                 event.status = "ignored"
 
-            event.processed_at = datetime.now(timezone.utc)
+            event.processed_at = datetime.now(UTC)
             if event.status == "processing":
                 event.status = "processed"
             db.commit()
         except Exception as exc:
             logger.exception("Webhook event failed", extra={"event_id": event_id})
+            db.rollback()
+            event = db.get(WebhookEvent, event_id)
+            if not event:
+                return
             event.status = "failed"
             event.error_message = str(exc)
-            event.processed_at = datetime.now(timezone.utc)
+            event.processed_at = datetime.now(UTC)
             db.commit()
 
 
@@ -75,7 +80,12 @@ def _handle_message_created(db: Session, update: MaxUpdateSchema) -> None:
 
     raw_text = message.body.text if message.body and message.body.text else ""
     user = _upsert_user(db, update)
-    conversation = _upsert_conversation(db, chat_id=message.recipient.chat_id, max_user_id=user.max_user_id, title=user.first_name)
+    conversation = _upsert_conversation(
+        db,
+        chat_id=message.recipient.chat_id,
+        max_user_id=user.max_user_id,
+        title=user.first_name,
+    )
     max_client = MaxBotClient(settings)
 
     command = raw_text.strip().lower()
@@ -86,7 +96,9 @@ def _handle_message_created(db: Session, update: MaxUpdateSchema) -> None:
         max_client.send_text_message(user_id=user.max_user_id, text=help_message(settings.max_bot_name))
         return
 
-    rate_limit = RedisRateLimiter(settings).check(RedisRateLimiter.user_key(user.max_user_id, action="incoming_message"))
+    rate_limit = RedisRateLimiter(settings).check(
+        RedisRateLimiter.user_key(user.max_user_id, action="incoming_message")
+    )
     if not rate_limit.is_allowed:
         max_client.send_text_message(user_id=user.max_user_id, text=rate_limit_message(rate_limit.retry_after_seconds))
         return
@@ -232,7 +244,8 @@ def generate_postcard(generation_id: int) -> None:
         prompt = generation.prompt
         user = prompt.user
         generation.status = "processing"
-        generation.started_at = datetime.now(timezone.utc)
+        generation.error_message = None
+        generation.started_at = datetime.now(UTC)
         db.commit()
 
         try:
@@ -272,7 +285,8 @@ def generate_postcard(generation_id: int) -> None:
             )
             generation.delivery_payload = delivery_payload
             generation.status = "completed"
-            generation.finished_at = datetime.now(timezone.utc)
+            generation.error_message = None
+            generation.finished_at = datetime.now(UTC)
 
             if generation.started_at:
                 delta = generation.finished_at - generation.started_at
@@ -282,7 +296,7 @@ def generate_postcard(generation_id: int) -> None:
             logger.exception("Generation failed", extra={"generation_id": generation_id})
             generation.status = "failed"
             generation.error_message = str(exc)
-            generation.finished_at = datetime.now(timezone.utc)
+            generation.finished_at = datetime.now(UTC)
             db.commit()
 
             try:
@@ -291,7 +305,10 @@ def generate_postcard(generation_id: int) -> None:
                     text=generation_failed_message(),
                 )
             except Exception:
-                logger.exception("Unable to notify user about generation failure", extra={"generation_id": generation_id})
+                logger.exception(
+                    "Unable to notify user about generation failure",
+                    extra={"generation_id": generation_id},
+                )
 
 
 def _count_active_generations(db: Session, user_id: int) -> int:
@@ -351,7 +368,7 @@ def _persist_user(
     locale: str | None,
 ) -> User:
     user = db.scalar(select(User).where(User.max_user_id == max_user_id))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if user is None:
         user = User(
             max_user_id=max_user_id,
@@ -370,7 +387,19 @@ def _persist_user(
         user.last_name = last_name
         user.locale = locale
         user.last_seen_at = now
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        user = db.scalar(select(User).where(User.max_user_id == max_user_id))
+        if user is None:
+            raise
+        user.username = username
+        user.first_name = first_name
+        user.last_name = last_name
+        user.locale = locale
+        user.last_seen_at = now
+        db.commit()
     db.refresh(user)
     return user
 

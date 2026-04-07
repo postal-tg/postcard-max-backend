@@ -17,8 +17,9 @@
 
 1. Скопируйте `.env.example` в `.env` и заполните токены.
 2. Backend при старте сам выполнит Alembic migrations.
-3. Из корня workspace выполните `docker compose up --build`.
-4. Backend будет доступен на `http://localhost:8000`.
+3. Для локального запуска всего продукта рядом должен лежать frontend-репозиторий `postcard_max_frontend`.
+4. Из корня backend-репозитория выполните `docker compose -f docker-compose.workspace.yml up --build`.
+5. Backend будет доступен на `http://localhost:8000`.
 
 ## Health endpoints
 
@@ -72,3 +73,17 @@ pip install ".[dev]"
 ruff check src tests
 pytest
 ```
+
+## Документация
+
+Этот репозиторий является основной точкой входа в проект. Здесь лежат backend, общая документация и deploy-файлы для всего продукта.
+
+- [Техническое задание](docs/TZ.md)
+- [Архитектура](docs/ARCHITECTURE.md)
+- [Конфигурация](docs/CONFIGURATION.md)
+- [Деплой](docs/DEPLOY.md)
+- [Git Setup](docs/GIT_SETUP.md)
+- [Deploy folder](deploy/README.md)
+- [Workspace compose](docker-compose.workspace.yml)
+
+Если смотреть проект на GitHub, для понимания всей системы достаточно открыть этот репозиторий.

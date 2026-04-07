@@ -1,11 +1,10 @@
 import csv
 import io
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from postcard_backend.core.config import get_settings
 from postcard_backend.db.session import get_db
@@ -154,7 +153,11 @@ def list_users(
         pattern = f"%{search}%"
         query = (
             select(User)
-            .where((User.username.ilike(pattern)) | (User.first_name.ilike(pattern)) | (User.last_name.ilike(pattern)))
+            .where(
+                (User.username.ilike(pattern))
+                | (User.first_name.ilike(pattern))
+                | (User.last_name.ilike(pattern))
+            )
             .order_by(User.last_seen_at.desc())
             .limit(limit)
         )
@@ -168,7 +171,12 @@ def get_user_detail(user_id: int, db: Session = Depends(get_db)) -> dict:
     if not item:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    prompts = db.scalars(select(Prompt).where(Prompt.user_id == item.id).order_by(Prompt.created_at.desc()).limit(20)).all()
+    prompts = db.scalars(
+        select(Prompt)
+        .where(Prompt.user_id == item.id)
+        .order_by(Prompt.created_at.desc())
+        .limit(20)
+    ).all()
     generations = db.scalars(
         select(GenerationRequest)
         .join(Prompt, Prompt.id == GenerationRequest.prompt_id)
@@ -205,7 +213,9 @@ def get_prompt_detail(prompt_id: int, db: Session = Depends(get_db)) -> dict:
 
     user = db.get(User, item.user_id)
     generations = db.scalars(
-        select(GenerationRequest).where(GenerationRequest.prompt_id == item.id).order_by(GenerationRequest.created_at.desc())
+        select(GenerationRequest)
+        .where(GenerationRequest.prompt_id == item.id)
+        .order_by(GenerationRequest.created_at.desc())
     ).all()
     return {
         "prompt": prompt_to_dict(item),
@@ -275,17 +285,26 @@ def list_errors(
 
 @router.get("/exports/users.csv", dependencies=[Depends(require_internal_api_key)])
 def export_users(db: Session = Depends(get_db)) -> Response:
-    rows = [user_to_dict(item) for item in db.scalars(select(User).order_by(User.id.asc())).all()]
+    rows = [
+        user_to_dict(item)
+        for item in db.scalars(select(User).order_by(User.id.asc())).all()
+    ]
     return csv_response("users.csv", rows)
 
 
 @router.get("/exports/prompts.csv", dependencies=[Depends(require_internal_api_key)])
 def export_prompts(db: Session = Depends(get_db)) -> Response:
-    rows = [prompt_to_dict(item) for item in db.scalars(select(Prompt).order_by(Prompt.id.asc())).all()]
+    rows = [
+        prompt_to_dict(item)
+        for item in db.scalars(select(Prompt).order_by(Prompt.id.asc())).all()
+    ]
     return csv_response("prompts.csv", rows)
 
 
 @router.get("/exports/generations.csv", dependencies=[Depends(require_internal_api_key)])
 def export_generations(db: Session = Depends(get_db)) -> Response:
-    rows = [generation_to_dict(item) for item in db.scalars(select(GenerationRequest).order_by(GenerationRequest.id.asc())).all()]
+    rows = [
+        generation_to_dict(item)
+        for item in db.scalars(select(GenerationRequest).order_by(GenerationRequest.id.asc())).all()
+    ]
     return csv_response("generations.csv", rows)

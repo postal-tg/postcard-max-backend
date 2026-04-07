@@ -6,8 +6,8 @@ from sqlalchemy import select
 from postcard_backend.core.config import get_settings
 from postcard_backend.db.session import new_session
 from postcard_backend.models import WebhookEvent
-from postcard_backend.tasks.workflows import process_webhook_event
 from postcard_backend.services.max_client import MaxBotClient
+from postcard_backend.tasks.workflows import process_webhook_event
 
 
 def build_external_event_id(payload: dict) -> str:

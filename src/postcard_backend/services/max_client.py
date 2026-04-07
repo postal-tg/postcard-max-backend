@@ -95,7 +95,17 @@ class MaxBotClient:
             timeout=60.0,
         )
         upload_response.raise_for_status()
-        return upload_response.json()
+        payload = upload_response.json()
+        if "token" in payload:
+            return payload
+
+        photos = payload.get("photos")
+        if isinstance(photos, dict):
+            for item in photos.values():
+                if isinstance(item, dict) and item.get("token"):
+                    return {**payload, "token": item["token"]}
+
+        return payload
 
     @retry(
         retry=retry_if_exception(_is_retryable_http_exception),
